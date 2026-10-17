@@ -229,6 +229,29 @@ async fn actual_company_management_and_invitation_login() {
     };
     assert!(!removed.active);
     assert!(identity.view().authenticated);
+    // Traverse the actual SQL keyset boundary; do not assume its collation is
+    // Rust byte ordering or synthesize a canned second page.
+    for _ in 0..51 {
+        let command = company
+            .invite(
+                format!("{}@example.invalid", uuid::Uuid::now_v7()),
+                OrganizationRoleView::User,
+            )
+            .await
+            .unwrap();
+        company.execute(&command).await.unwrap();
+    }
+    let first = company.invitations(None).await.unwrap();
+    assert_eq!(first.invitations.len(), 50);
+    let second = company.invitations(first.next_cursor).await.unwrap();
+    assert_eq!(second.invitations.len(), 3);
+    assert!(second.next_cursor.is_none());
+    assert!(
+        second
+            .invitations
+            .iter()
+            .all(|item| !first.invitations.iter().any(|old| old.id == item.id))
+    );
     identity.logout().await.unwrap();
     println!(
         "Owned Rust company overview, invitation replay/revoke/OTP, owner isolation, roles, revision conflict and last-admin protection passed"
