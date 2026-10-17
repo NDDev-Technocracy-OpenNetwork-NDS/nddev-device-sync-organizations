@@ -2,6 +2,7 @@
 //! Core policies decide access on every attempt, including idempotent replays.
 mod codec;
 pub mod view;
+use nddev_device_sync_accounts::runtime;
 use nddev_device_sync_accounts::{
     ClientError, IdentityClient, LocalUseFence, SyncRequest, company::CompanyRequest,
     company_wire as dto,
@@ -10,7 +11,7 @@ use nddev_device_sync_domain::{
     identity::EmailAddress,
     organizations::{CompanyName, commands::CommandId},
 };
-use std::sync::Arc;
+use std::{future::Future, sync::Arc, time::Duration};
 use tracing::Instrument;
 
 fn invalid() -> ClientError {
@@ -21,6 +22,27 @@ fn now_ms() -> Result<u64, ClientError> {
         .try_into()
         .map_err(|_| ClientError::InvalidInput)
 }
+// Only local admission contention is retried. Network failures and server
+// rejections keep their original outcome. No new queue or command is created.
+async fn admitted<T, F: Future<Output = Result<T, ClientError>>>(
+    mut work: impl FnMut() -> F,
+) -> Result<T, ClientError> {
+    let started = runtime::Instant::now();
+    for attempt in 0..8 {
+        match work().await {
+            Err(ClientError::Busy) if attempt < 7 && started.elapsed() < Duration::from_secs(2) => {
+                if attempt == 0 {
+                    tracing::info!(target: "nddev_device_sync_organizations", module = "organizations", scope = "http",
+                        event.name = "company.admission.waiting", outcome = "retry", reason = "local_busy");
+                }
+                runtime::sleep(Duration::from_millis((25_u64 << attempt).min(400))).await;
+            }
+            result => return result,
+        }
+    }
+    Err(ClientError::Busy)
+}
+
 pub struct OrganizationsClient {
     identity: Arc<IdentityClient>,
 }
@@ -47,22 +69,26 @@ impl OrganizationsClient {
     }
     async fn read<T: serde::de::DeserializeOwned>(
         &self,
-        request: CompanyRequest,
+        request: impl Fn() -> CompanyRequest,
     ) -> Result<T, ClientError> {
-        let fence = self.identity.local_use_fence().await?;
-        let reply = self
-            .identity
-            .sync_request(SyncRequest::Company(request))
-            .await?;
-        self.identity.validate_local_use(&fence).await?;
-        if reply.status != 200 {
-            return Err(invalid());
-        }
-        serde_json::from_slice(&reply.body).map_err(|_| invalid())
+        let lifetime = self.identity.local_use_lifetime();
+        admitted(|| async {
+            let fence = self.identity.local_use_fence_from(&lifetime).await?;
+            let reply = self
+                .identity
+                .sync_request(SyncRequest::Company(request()))
+                .await?;
+            self.identity.validate_local_use(&fence).await?;
+            if reply.status != 200 {
+                return Err(invalid());
+            }
+            serde_json::from_slice(&reply.body).map_err(|_| invalid())
+        })
+        .await
     }
     pub async fn overview(&self) -> Result<view::OrganizationOverviewView, ClientError> {
         let scope = self.identity.view();
-        let result: dto::CompanyOverview = self.read(CompanyRequest::Overview).await?;
+        let result: dto::CompanyOverview = self.read(|| CompanyRequest::Overview).await?;
         if result.company.company_id != scope.tenant_id
             || result.member.user_id != scope.user_id
             || !result.member.active
@@ -82,7 +108,7 @@ impl OrganizationsClient {
         after: Option<String>,
     ) -> Result<view::OrganizationMemberPageView, ClientError> {
         let value: dto::CompanyMemberPage = self
-            .read(CompanyRequest::Members {
+            .read(|| CompanyRequest::Members {
                 after: after.clone(),
             })
             .await?;
@@ -105,7 +131,7 @@ impl OrganizationsClient {
         after: Option<String>,
     ) -> Result<view::OrganizationInvitationPageView, ClientError> {
         let value: dto::CompanyInvitationPage = self
-            .read(CompanyRequest::Invitations {
+            .read(|| CompanyRequest::Invitations {
                 after: after.clone(),
             })
             .await?;
@@ -131,7 +157,8 @@ impl OrganizationsClient {
         target: Target,
         body: impl FnOnce(String) -> Result<Vec<u8>, ClientError>,
     ) -> Result<PreparedCommand, ClientError> {
-        let fence = self.identity.local_use_fence().await?;
+        let lifetime = self.identity.local_use_lifetime();
+        let fence = admitted(|| self.identity.local_use_fence_from(&lifetime)).await?;
         let scope = self.identity.view();
         let id = CommandId::new(uuid::Uuid::now_v7().to_string())
             .map_err(|_| ClientError::InvalidInput)?;
@@ -205,7 +232,7 @@ impl OrganizationsClient {
         let span = nddev_device_sync_telemetry::operation_span("organizations", "http")
             .map_err(|_| ClientError::TelemetryUnavailable)?;
         async {
-            let result = self.execute_inner(command).await;
+            let result = admitted(|| self.execute_inner(command)).await;
             match &result {
                 Ok(_) => tracing::event!(target: "nddev_device_sync_organizations", tracing::Level::INFO,
                     { event.name = "company.command.completed", operation.id = command.id.as_str(),

@@ -28,3 +28,8 @@ verification, account switching, role revision conflicts and last-admin denial.
 Unit tests or WASM compilation alone are not platform/runtime qualification.
 
 Signed work → dev → main. No implicit release or live deployment.
+
+Local `busy` contention with background work has at most eight admission attempts
+with a bounded 25–400 ms delay. The same captured identity lifetime and immutable
+command are retained. Transport errors, remote rejections and expired commands
+are not automatically retried. This does not add an operation queue or stop sync.
