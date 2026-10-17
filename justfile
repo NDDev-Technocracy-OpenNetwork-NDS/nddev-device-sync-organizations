@@ -8,7 +8,7 @@ check:
     cargo deny --locked check licenses sources
 
 wasm-check:
-    cargo clippy --locked --lib --target wasm32-unknown-unknown -- -D warnings
+    cargo clippy --locked --lib --features browser-bindings --target wasm32-unknown-unknown -- -D warnings
 
 # Requires a private receipt and an isolated real native credential service.
 backend-acceptance:

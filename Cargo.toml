@@ -7,19 +7,22 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-organizations"
 
 [features]
+browser-bindings = ["dep:tsify", "dep:wasm-bindgen"]
 development-http = ["nddev-device-sync-accounts/development-http"]
 
 [dependencies]
-nddev-device-sync-accounts = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-accounts", rev = "1d4255eb1c37ab8ed40456ef28a1f32cdfa05d81" }
+nddev-device-sync-accounts = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-accounts", rev = "101365418cf5a7fa0dd680af1ed72c357070a9ed" }
 nddev-device-sync-domain = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git", rev = "0135c86b2887c7cea96c0f1082d70560bde00cc6" }
 serde_json = "1"
 serde = "1"
 time = "0.3"
 uuid = { version = "1.27", features = ["v7"] }
 tracing = "0.1"
-nddev-device-sync-telemetry = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-observability", rev = "6cf8b2ee69fd6a64bd218b47db55378191f66907" }
+nddev-device-sync-telemetry = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-observability", rev = "1327eb1fc1a31bd767582d1fa204d2ae204b89df" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "=0.2.129", optional = true }
+tsify = { version = "=0.5.8", default-features = false, features = ["js"], optional = true }
 uuid = { version = "1.27", features = ["js"] }
 time = { version = "0.3", features = ["wasm-bindgen"] }
 
