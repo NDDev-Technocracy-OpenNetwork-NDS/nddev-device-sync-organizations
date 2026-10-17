@@ -1629,6 +1629,8 @@ dependencies = [
  "nddev-device-sync-accounts",
  "nddev-device-sync-domain",
  "nddev-device-sync-telemetry",
+ "opentelemetry",
+ "opentelemetry_sdk",
  "reqwest",
  "serde",
  "serde_json",

@@ -32,8 +32,8 @@ async fn admitted<T, F: Future<Output = Result<T, ClientError>>>(
         match work().await {
             Err(ClientError::Busy) if attempt < 7 && started.elapsed() < Duration::from_secs(2) => {
                 if attempt == 0 {
-                    tracing::info!(target: "nddev_device_sync_organizations", module = "organizations", scope = "http",
-                        event.name = "company.admission.waiting", outcome = "retry", reason = "local_busy");
+                    tracing::info!(target: "nddev_device_sync_organizations", module = "organizations", scope = "process",
+                        event.name = "company.admission.waiting", outcome = "pending");
                 }
                 runtime::sleep(Duration::from_millis((25_u64 << attempt).min(400))).await;
             }
@@ -304,6 +304,81 @@ impl OrganizationsClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_admission_wait_is_bounded_and_accepted_by_the_actual_sdk() {
+        use opentelemetry::trace::TracerProvider;
+        use std::{io::Write, sync::Mutex};
+        #[derive(Clone)]
+        struct Output(Arc<Mutex<Vec<u8>>>);
+        impl Write for Output {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let output = Output(Arc::default());
+        let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder().build();
+        let (subscriber, control) = nddev_device_sync_telemetry::subscriber(
+            nddev_device_sync_telemetry::Config {
+                service: "organizations-acceptance".into(),
+                version: env!("CARGO_PKG_VERSION").into(),
+                repository: "NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-organizations"
+                    .into(),
+                commit: "unknown".into(),
+                channel: "alpha".into(),
+                standards: "unreleased".into(),
+                environment: "test".into(),
+                target_prefixes: vec!["nddev_device_sync_organizations".into()],
+                default_module: "process".into(),
+                debug: None,
+            },
+            output.clone(),
+            provider.tracer("organizations-acceptance"),
+        )
+        .unwrap();
+        tracing::subscriber::with_default(subscriber, || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                let mut attempts = 0;
+                let result: Result<(), _> = admitted(|| {
+                    attempts += 1;
+                    std::future::ready(Err(ClientError::Busy))
+                })
+                .await;
+                assert_eq!(result, Err(ClientError::Busy));
+                assert_eq!(attempts, 8);
+                let mut attempts = 0;
+                let result: Result<(), _> = admitted(|| {
+                    attempts += 1;
+                    std::future::ready(Err(ClientError::Transport))
+                })
+                .await;
+                assert_eq!(result, Err(ClientError::Transport));
+                assert_eq!(attempts, 1);
+            });
+        });
+        assert_eq!(control.rejected_fields_or_events(), 0);
+        let bytes = output.0.lock().unwrap();
+        let events: Vec<serde_json::Value> = std::str::from_utf8(&bytes)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let waiting: Vec<_> = events
+            .iter()
+            .filter(|event| event["event.name"] == "company.admission.waiting")
+            .collect();
+        assert_eq!(waiting.len(), 1);
+        assert_eq!(waiting[0]["outcome"], "pending");
+        assert_eq!(waiting[0]["module"], "organizations");
+    }
+
     #[test]
     fn pages_reject_nonadvancing_duplicates_and_unbounded_results() {
         assert!(codec::page(["b", "c"].into_iter(), Some("a"), Some("c")).is_ok());
