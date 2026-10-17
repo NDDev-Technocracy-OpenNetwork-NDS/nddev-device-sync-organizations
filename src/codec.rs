@@ -24,24 +24,26 @@ pub(crate) fn invitation_id(value: &str) -> Result<(), ClientError> {
         Err(invalid())
     }
 }
-pub(crate) fn role(value: dto::Role) -> view::CompanyRoleView {
+pub(crate) fn role(value: dto::Role) -> view::OrganizationRoleView {
     match value {
-        dto::Role::Admin => view::CompanyRoleView::Admin,
-        dto::Role::User => view::CompanyRoleView::User,
+        dto::Role::Admin => view::OrganizationRoleView::Admin,
+        dto::Role::User => view::OrganizationRoleView::User,
     }
 }
-pub(crate) fn wire_role(value: view::CompanyRoleView) -> dto::Role {
+pub(crate) fn wire_role(value: view::OrganizationRoleView) -> dto::Role {
     match value {
-        view::CompanyRoleView::Admin => dto::Role::Admin,
-        view::CompanyRoleView::User => dto::Role::User,
+        view::OrganizationRoleView::Admin => dto::Role::Admin,
+        view::OrganizationRoleView::User => dto::Role::User,
     }
 }
-pub(crate) fn member(value: dto::CompanyMember) -> Result<view::CompanyMemberView, ClientError> {
+pub(crate) fn member(
+    value: dto::CompanyMember,
+) -> Result<view::OrganizationMemberView, ClientError> {
     id(&value.user_id)?;
     if let Some(email) = &value.email {
         EmailAddress::parse(email).map_err(|_| invalid())?;
     }
-    Ok(view::CompanyMemberView {
+    Ok(view::OrganizationMemberView {
         user_id: value.user_id,
         email: value.email,
         role: role(value.role),
@@ -51,27 +53,27 @@ pub(crate) fn member(value: dto::CompanyMember) -> Result<view::CompanyMemberVie
 }
 pub(crate) fn invitation(
     value: dto::CompanyInvitation,
-) -> Result<view::CompanyInvitationView, ClientError> {
+) -> Result<view::OrganizationInvitationView, ClientError> {
     invitation_id(&value.invitation_id)?;
     id(&value.issuer_user_id)?;
     EmailAddress::parse(&value.recipient_email).map_err(|_| invalid())?;
-    Ok(view::CompanyInvitationView {
+    Ok(view::OrganizationInvitationView {
         id: value.invitation_id,
         issuer_user_id: value.issuer_user_id,
         email: value.recipient_email,
         role: role(value.role),
         expires_at_ms: revision(value.expires_at_ms)?,
         status: match value.status {
-            dto::Status::Pending => view::CompanyInvitationStatus::Pending,
-            dto::Status::Accepted => view::CompanyInvitationStatus::Accepted,
-            dto::Status::Expired => view::CompanyInvitationStatus::Expired,
-            dto::Status::Revoked => view::CompanyInvitationStatus::Revoked,
+            dto::Status::Pending => view::OrganizationInvitationStatusView::Pending,
+            dto::Status::Accepted => view::OrganizationInvitationStatusView::Accepted,
+            dto::Status::Expired => view::OrganizationInvitationStatusView::Expired,
+            dto::Status::Revoked => view::OrganizationInvitationStatusView::Revoked,
         },
         delivery: match value.delivery {
-            dto::Delivery::Pending => view::CompanyDeliveryView::Pending,
-            dto::Delivery::Accepted => view::CompanyDeliveryView::Accepted,
-            dto::Delivery::Failed => view::CompanyDeliveryView::Failed,
-            dto::Delivery::Unknown => view::CompanyDeliveryView::Unknown,
+            dto::Delivery::Pending => view::OrganizationDeliveryView::Pending,
+            dto::Delivery::Accepted => view::OrganizationDeliveryView::Accepted,
+            dto::Delivery::Failed => view::OrganizationDeliveryView::Failed,
+            dto::Delivery::Unknown => view::OrganizationDeliveryView::Unknown,
         },
     })
 }
@@ -82,10 +84,12 @@ pub(crate) fn page<'a>(
     after: Option<&str>,
     next: Option<&str>,
 ) -> Result<(), ClientError> {
-    let mut previous = after;
+    // Cursor IDs are opaque: SQL collation need not be Rust byte ordering.
+    let mut previous = None;
+    let mut seen = std::collections::BTreeSet::new();
     let mut count = 0;
     for id in ids {
-        if previous.is_some_and(|previous| previous >= id) {
+        if Some(id) == after || !seen.insert(id) {
             return Err(invalid());
         }
         previous = Some(id);

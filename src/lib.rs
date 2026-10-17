@@ -60,7 +60,7 @@ impl OrganizationsClient {
         }
         serde_json::from_slice(&reply.body).map_err(|_| invalid())
     }
-    pub async fn overview(&self) -> Result<view::CompanyOverview, ClientError> {
+    pub async fn overview(&self) -> Result<view::OrganizationOverviewView, ClientError> {
         let scope = self.identity.view();
         let result: dto::CompanyOverview = self.read(CompanyRequest::Overview).await?;
         if result.company.company_id != scope.tenant_id
@@ -70,7 +70,7 @@ impl OrganizationsClient {
             return Err(invalid());
         }
         CompanyName::new(result.company.display_name.clone()).map_err(|_| invalid())?;
-        Ok(view::CompanyOverview {
+        Ok(view::OrganizationOverviewView {
             company_id: result.company.company_id,
             name: result.company.display_name,
             revision: codec::revision(result.company.revision)?,
@@ -80,7 +80,7 @@ impl OrganizationsClient {
     pub async fn members(
         &self,
         after: Option<String>,
-    ) -> Result<view::CompanyMemberPage, ClientError> {
+    ) -> Result<view::OrganizationMemberPageView, ClientError> {
         let value: dto::CompanyMemberPage = self
             .read(CompanyRequest::Members {
                 after: after.clone(),
@@ -91,7 +91,7 @@ impl OrganizationsClient {
             after.as_deref(),
             value.next_cursor.as_deref(),
         )?;
-        Ok(view::CompanyMemberPage {
+        Ok(view::OrganizationMemberPageView {
             members: value
                 .members
                 .into_iter()
@@ -103,7 +103,7 @@ impl OrganizationsClient {
     pub async fn invitations(
         &self,
         after: Option<String>,
-    ) -> Result<view::CompanyInvitationPage, ClientError> {
+    ) -> Result<view::OrganizationInvitationPageView, ClientError> {
         let value: dto::CompanyInvitationPage = self
             .read(CompanyRequest::Invitations {
                 after: after.clone(),
@@ -117,7 +117,7 @@ impl OrganizationsClient {
             after.as_deref(),
             value.next_cursor.as_deref(),
         )?;
-        Ok(view::CompanyInvitationPage {
+        Ok(view::OrganizationInvitationPageView {
             invitations: value
                 .invitations
                 .into_iter()
@@ -149,7 +149,7 @@ impl OrganizationsClient {
     pub async fn invite(
         &self,
         email: String,
-        role: view::CompanyRoleView,
+        role: view::OrganizationRoleView,
     ) -> Result<PreparedCommand, ClientError> {
         let email = EmailAddress::parse(&email)
             .map_err(|_| ClientError::InvalidInput)?
@@ -178,7 +178,7 @@ impl OrganizationsClient {
         &self,
         user: String,
         revision: u64,
-        role: Option<view::CompanyRoleView>,
+        role: Option<view::OrganizationRoleView>,
     ) -> Result<PreparedCommand, ClientError> {
         codec::id(&user).map_err(|_| ClientError::InvalidInput)?;
         let revision = i64::try_from(revision).map_err(|_| ClientError::InvalidInput)?;
@@ -201,7 +201,7 @@ impl OrganizationsClient {
     pub async fn execute(
         &self,
         command: &PreparedCommand,
-    ) -> Result<view::CompanyCommandResult, ClientError> {
+    ) -> Result<view::OrganizationCommandResult, ClientError> {
         let span = nddev_device_sync_telemetry::operation_span("organizations", "http")
             .map_err(|_| ClientError::TelemetryUnavailable)?;
         async {
@@ -221,7 +221,7 @@ impl OrganizationsClient {
     async fn execute_inner(
         &self,
         command: &PreparedCommand,
-    ) -> Result<view::CompanyCommandResult, ClientError> {
+    ) -> Result<view::OrganizationCommandResult, ClientError> {
         command
             .id
             .validate(now_ms()?)
@@ -260,7 +260,7 @@ impl OrganizationsClient {
                 if &member.user_id != id {
                     return Err(invalid());
                 }
-                Ok(view::CompanyCommandResult::Member(member))
+                Ok(view::OrganizationCommandResult::Member(member))
             }
             target => {
                 let invitation =
@@ -268,7 +268,7 @@ impl OrganizationsClient {
                 if matches!(target, Target::Revoke(id) if id != &invitation.id) {
                     return Err(invalid());
                 }
-                Ok(view::CompanyCommandResult::Invitation(invitation))
+                Ok(view::OrganizationCommandResult::Invitation(invitation))
             }
         }
     }
@@ -281,6 +281,9 @@ mod tests {
     fn pages_reject_nonadvancing_duplicates_and_unbounded_results() {
         assert!(codec::page(["b", "c"].into_iter(), Some("a"), Some("c")).is_ok());
         assert!(codec::page(["a"].into_iter(), Some("a"), None).is_err());
+        assert!(codec::page(["b", "A"].into_iter(), None, Some("A")).is_ok());
+        let oversized: Vec<String> = (0..51).map(|value| format!("id{value}")).collect();
+        assert!(codec::page(oversized.iter().map(String::as_str), None, None).is_err());
         assert!(codec::page(["b", "b"].into_iter(), None, None).is_err());
         assert!(codec::page(["b"].into_iter(), None, Some("z")).is_err());
         assert!(codec::page([].into_iter(), None, Some("z")).is_err());

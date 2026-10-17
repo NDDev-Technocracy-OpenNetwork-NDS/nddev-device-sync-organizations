@@ -2,7 +2,7 @@
 use nddev_device_sync_accounts::IdentityClient;
 use nddev_device_sync_organizations::{
     OrganizationsClient,
-    view::{CompanyCommandResult, CompanyInvitationStatus, CompanyRoleView},
+    view::{OrganizationCommandResult, OrganizationInvitationStatusView, OrganizationRoleView},
 };
 use serde_json::Value;
 use std::{sync::Arc, time::Duration};
@@ -79,10 +79,10 @@ async fn login(identity: &IdentityClient, http: &reqwest::Client, mailbox: &str,
         .unwrap();
 }
 fn invitation(
-    result: CompanyCommandResult,
-) -> nddev_device_sync_organizations::view::CompanyInvitationView {
+    result: OrganizationCommandResult,
+) -> nddev_device_sync_organizations::view::OrganizationInvitationView {
     match result {
-        CompanyCommandResult::Invitation(value) => value,
+        OrganizationCommandResult::Invitation(value) => value,
         _ => panic!("expected invitation"),
     }
 }
@@ -109,7 +109,7 @@ async fn actual_company_management_and_invitation_login() {
     login(&identity, &http, mailbox, owner).await;
     let company = OrganizationsClient::new(identity.clone());
     let admin = company.overview().await.unwrap();
-    assert!(admin.member.active && admin.member.role == CompanyRoleView::Admin);
+    assert!(admin.member.active && admin.member.role == OrganizationRoleView::Admin);
     let remove = company
         .change_member(admin.member.user_id.clone(), admin.member.revision, None)
         .await
@@ -122,7 +122,7 @@ async fn actual_company_management_and_invitation_login() {
     let email = format!("{}@example.invalid", uuid::Uuid::now_v7());
     let before = messages(&http, mailbox).await;
     let create = company
-        .invite(email.clone(), CompanyRoleView::User)
+        .invite(email.clone(), OrganizationRoleView::User)
         .await
         .unwrap();
     let issued = invitation(company.execute(&create).await.unwrap());
@@ -143,18 +143,18 @@ async fn actual_company_management_and_invitation_login() {
     assert!(fragment.starts_with(endpoint));
     let cancel_email = format!("{}@example.invalid", uuid::Uuid::now_v7());
     let cancel = company
-        .invite(cancel_email, CompanyRoleView::User)
+        .invite(cancel_email, OrganizationRoleView::User)
         .await
         .unwrap();
     let cancelled = invitation(company.execute(&cancel).await.unwrap());
     let revoke = company.revoke(cancelled.id).await.unwrap();
     assert!(
         invitation(company.execute(&revoke).await.unwrap()).status
-            == CompanyInvitationStatus::Revoked
+            == OrganizationInvitationStatusView::Revoked
     );
     assert!(
         invitation(company.execute(&revoke).await.unwrap()).status
-            == CompanyInvitationStatus::Revoked
+            == OrganizationInvitationStatusView::Revoked
     );
     assert_eq!(
         identity
@@ -179,7 +179,7 @@ async fn actual_company_management_and_invitation_login() {
     assert!(
         user.company_id == admin.company_id
             && user.member.user_id != admin.member.user_id
-            && user.member.role == CompanyRoleView::User
+            && user.member.role == OrganizationRoleView::User
     );
     assert_eq!(
         company.members(None).await.err().unwrap().code(),
@@ -201,15 +201,17 @@ async fn actual_company_management_and_invitation_login() {
         .change_member(
             member.user_id.clone(),
             member.revision,
-            Some(CompanyRoleView::Admin),
+            Some(OrganizationRoleView::Admin),
         )
         .await
         .unwrap();
     let result = company.execute(&promote).await.unwrap();
-    let CompanyCommandResult::Member(promoted) = result else {
+    let OrganizationCommandResult::Member(promoted) = result else {
         panic!("expected member");
     };
-    assert!(promoted.role == CompanyRoleView::Admin && promoted.revision == member.revision + 1);
+    assert!(
+        promoted.role == OrganizationRoleView::Admin && promoted.revision == member.revision + 1
+    );
     let stale = company
         .change_member(member.user_id.clone(), member.revision, None)
         .await
@@ -222,7 +224,7 @@ async fn actual_company_management_and_invitation_login() {
         .change_member(member.user_id.clone(), promoted.revision, None)
         .await
         .unwrap();
-    let CompanyCommandResult::Member(removed) = company.execute(&remove).await.unwrap() else {
+    let OrganizationCommandResult::Member(removed) = company.execute(&remove).await.unwrap() else {
         panic!("expected member");
     };
     assert!(!removed.active);

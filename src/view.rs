@@ -1,59 +1,59 @@
 //! Presentation metadata only; never an invitation token, session or key.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum CompanyRoleView {
+pub enum OrganizationRoleView {
     Admin,
     User,
 }
 #[derive(Clone)]
-pub struct CompanyMemberView {
+pub struct OrganizationMemberView {
     pub user_id: String,
     pub email: Option<String>,
-    pub role: CompanyRoleView,
+    pub role: OrganizationRoleView,
     pub active: bool,
     pub revision: u64,
 }
 #[derive(Clone)]
-pub struct CompanyOverview {
+pub struct OrganizationOverviewView {
     pub company_id: String,
     pub name: String,
     pub revision: u64,
-    pub member: CompanyMemberView,
+    pub member: OrganizationMemberView,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum CompanyInvitationStatus {
+pub enum OrganizationInvitationStatusView {
     Pending,
     Accepted,
     Expired,
     Revoked,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum CompanyDeliveryView {
+pub enum OrganizationDeliveryView {
     Pending,
     Accepted,
     Failed,
     Unknown,
 }
 #[derive(Clone)]
-pub struct CompanyInvitationView {
+pub struct OrganizationInvitationView {
     pub id: String,
     pub issuer_user_id: String,
     pub email: String,
-    pub role: CompanyRoleView,
+    pub role: OrganizationRoleView,
     pub expires_at_ms: u64,
-    pub status: CompanyInvitationStatus,
-    pub delivery: CompanyDeliveryView,
+    pub status: OrganizationInvitationStatusView,
+    pub delivery: OrganizationDeliveryView,
 }
 #[derive(Clone)]
-pub struct CompanyMemberPage {
-    pub members: Vec<CompanyMemberView>,
+pub struct OrganizationMemberPageView {
+    pub members: Vec<OrganizationMemberView>,
     pub next_cursor: Option<String>,
 }
 #[derive(Clone)]
-pub struct CompanyInvitationPage {
-    pub invitations: Vec<CompanyInvitationView>,
+pub struct OrganizationInvitationPageView {
+    pub invitations: Vec<OrganizationInvitationView>,
     pub next_cursor: Option<String>,
 }
-pub enum CompanyCommandResult {
-    Invitation(CompanyInvitationView),
-    Member(CompanyMemberView),
+pub enum OrganizationCommandResult {
+    Invitation(OrganizationInvitationView),
+    Member(OrganizationMemberView),
 }
