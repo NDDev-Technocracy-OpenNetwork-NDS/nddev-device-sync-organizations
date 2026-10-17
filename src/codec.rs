@@ -24,24 +24,24 @@ pub(crate) fn invitation_id(value: &str) -> Result<(), ClientError> {
         Err(invalid())
     }
 }
-pub(crate) fn role(value: dto::Role) -> view::Role {
+pub(crate) fn role(value: dto::Role) -> view::CompanyRoleView {
     match value {
-        dto::Role::Admin => view::Role::Admin,
-        dto::Role::User => view::Role::User,
+        dto::Role::Admin => view::CompanyRoleView::Admin,
+        dto::Role::User => view::CompanyRoleView::User,
     }
 }
-pub(crate) fn wire_role(value: view::Role) -> dto::Role {
+pub(crate) fn wire_role(value: view::CompanyRoleView) -> dto::Role {
     match value {
-        view::Role::Admin => dto::Role::Admin,
-        view::Role::User => dto::Role::User,
+        view::CompanyRoleView::Admin => dto::Role::Admin,
+        view::CompanyRoleView::User => dto::Role::User,
     }
 }
-pub(crate) fn member(value: dto::CompanyMember) -> Result<view::Member, ClientError> {
+pub(crate) fn member(value: dto::CompanyMember) -> Result<view::CompanyMemberView, ClientError> {
     id(&value.user_id)?;
     if let Some(email) = &value.email {
         EmailAddress::parse(email).map_err(|_| invalid())?;
     }
-    Ok(view::Member {
+    Ok(view::CompanyMemberView {
         user_id: value.user_id,
         email: value.email,
         role: role(value.role),
@@ -49,27 +49,29 @@ pub(crate) fn member(value: dto::CompanyMember) -> Result<view::Member, ClientEr
         revision: revision(value.revision)?,
     })
 }
-pub(crate) fn invitation(value: dto::CompanyInvitation) -> Result<view::Invitation, ClientError> {
+pub(crate) fn invitation(
+    value: dto::CompanyInvitation,
+) -> Result<view::CompanyInvitationView, ClientError> {
     invitation_id(&value.invitation_id)?;
     id(&value.issuer_user_id)?;
     EmailAddress::parse(&value.recipient_email).map_err(|_| invalid())?;
-    Ok(view::Invitation {
+    Ok(view::CompanyInvitationView {
         id: value.invitation_id,
         issuer_user_id: value.issuer_user_id,
         email: value.recipient_email,
         role: role(value.role),
         expires_at_ms: revision(value.expires_at_ms)?,
         status: match value.status {
-            dto::Status::Pending => view::InvitationStatus::Pending,
-            dto::Status::Accepted => view::InvitationStatus::Accepted,
-            dto::Status::Expired => view::InvitationStatus::Expired,
-            dto::Status::Revoked => view::InvitationStatus::Revoked,
+            dto::Status::Pending => view::CompanyInvitationStatus::Pending,
+            dto::Status::Accepted => view::CompanyInvitationStatus::Accepted,
+            dto::Status::Expired => view::CompanyInvitationStatus::Expired,
+            dto::Status::Revoked => view::CompanyInvitationStatus::Revoked,
         },
         delivery: match value.delivery {
-            dto::Delivery::Pending => view::Delivery::Pending,
-            dto::Delivery::Accepted => view::Delivery::Accepted,
-            dto::Delivery::Failed => view::Delivery::Failed,
-            dto::Delivery::Unknown => view::Delivery::Unknown,
+            dto::Delivery::Pending => view::CompanyDeliveryView::Pending,
+            dto::Delivery::Accepted => view::CompanyDeliveryView::Accepted,
+            dto::Delivery::Failed => view::CompanyDeliveryView::Failed,
+            dto::Delivery::Unknown => view::CompanyDeliveryView::Unknown,
         },
     })
 }

@@ -60,7 +60,7 @@ impl OrganizationsClient {
         }
         serde_json::from_slice(&reply.body).map_err(|_| invalid())
     }
-    pub async fn overview(&self) -> Result<view::Overview, ClientError> {
+    pub async fn overview(&self) -> Result<view::CompanyOverview, ClientError> {
         let scope = self.identity.view();
         let result: dto::CompanyOverview = self.read(CompanyRequest::Overview).await?;
         if result.company.company_id != scope.tenant_id
@@ -70,14 +70,17 @@ impl OrganizationsClient {
             return Err(invalid());
         }
         CompanyName::new(result.company.display_name.clone()).map_err(|_| invalid())?;
-        Ok(view::Overview {
+        Ok(view::CompanyOverview {
             company_id: result.company.company_id,
             name: result.company.display_name,
             revision: codec::revision(result.company.revision)?,
             member: codec::member(result.member)?,
         })
     }
-    pub async fn members(&self, after: Option<String>) -> Result<view::MemberPage, ClientError> {
+    pub async fn members(
+        &self,
+        after: Option<String>,
+    ) -> Result<view::CompanyMemberPage, ClientError> {
         let value: dto::CompanyMemberPage = self
             .read(CompanyRequest::Members {
                 after: after.clone(),
@@ -88,7 +91,7 @@ impl OrganizationsClient {
             after.as_deref(),
             value.next_cursor.as_deref(),
         )?;
-        Ok(view::MemberPage {
+        Ok(view::CompanyMemberPage {
             members: value
                 .members
                 .into_iter()
@@ -100,7 +103,7 @@ impl OrganizationsClient {
     pub async fn invitations(
         &self,
         after: Option<String>,
-    ) -> Result<view::InvitationPage, ClientError> {
+    ) -> Result<view::CompanyInvitationPage, ClientError> {
         let value: dto::CompanyInvitationPage = self
             .read(CompanyRequest::Invitations {
                 after: after.clone(),
@@ -114,7 +117,7 @@ impl OrganizationsClient {
             after.as_deref(),
             value.next_cursor.as_deref(),
         )?;
-        Ok(view::InvitationPage {
+        Ok(view::CompanyInvitationPage {
             invitations: value
                 .invitations
                 .into_iter()
@@ -146,7 +149,7 @@ impl OrganizationsClient {
     pub async fn invite(
         &self,
         email: String,
-        role: view::Role,
+        role: view::CompanyRoleView,
     ) -> Result<PreparedCommand, ClientError> {
         let email = EmailAddress::parse(&email)
             .map_err(|_| ClientError::InvalidInput)?
@@ -175,7 +178,7 @@ impl OrganizationsClient {
         &self,
         user: String,
         revision: u64,
-        role: Option<view::Role>,
+        role: Option<view::CompanyRoleView>,
     ) -> Result<PreparedCommand, ClientError> {
         codec::id(&user).map_err(|_| ClientError::InvalidInput)?;
         let revision = i64::try_from(revision).map_err(|_| ClientError::InvalidInput)?;
@@ -198,7 +201,7 @@ impl OrganizationsClient {
     pub async fn execute(
         &self,
         command: &PreparedCommand,
-    ) -> Result<view::CommandResult, ClientError> {
+    ) -> Result<view::CompanyCommandResult, ClientError> {
         let span = nddev_device_sync_telemetry::operation_span("organizations", "http")
             .map_err(|_| ClientError::TelemetryUnavailable)?;
         async {
@@ -218,7 +221,7 @@ impl OrganizationsClient {
     async fn execute_inner(
         &self,
         command: &PreparedCommand,
-    ) -> Result<view::CommandResult, ClientError> {
+    ) -> Result<view::CompanyCommandResult, ClientError> {
         command
             .id
             .validate(now_ms()?)
@@ -257,7 +260,7 @@ impl OrganizationsClient {
                 if &member.user_id != id {
                     return Err(invalid());
                 }
-                Ok(view::CommandResult::Member(member))
+                Ok(view::CompanyCommandResult::Member(member))
             }
             target => {
                 let invitation =
@@ -265,7 +268,7 @@ impl OrganizationsClient {
                 if matches!(target, Target::Revoke(id) if id != &invitation.id) {
                     return Err(invalid());
                 }
-                Ok(view::CommandResult::Invitation(invitation))
+                Ok(view::CompanyCommandResult::Invitation(invitation))
             }
         }
     }

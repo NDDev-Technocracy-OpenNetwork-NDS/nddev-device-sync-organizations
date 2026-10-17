@@ -1,59 +1,59 @@
 //! Presentation metadata only; never an invitation token, session or key.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Role {
+pub enum CompanyRoleView {
     Admin,
     User,
 }
 #[derive(Clone)]
-pub struct Member {
+pub struct CompanyMemberView {
     pub user_id: String,
     pub email: Option<String>,
-    pub role: Role,
+    pub role: CompanyRoleView,
     pub active: bool,
     pub revision: u64,
 }
 #[derive(Clone)]
-pub struct Overview {
+pub struct CompanyOverview {
     pub company_id: String,
     pub name: String,
     pub revision: u64,
-    pub member: Member,
+    pub member: CompanyMemberView,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum InvitationStatus {
+pub enum CompanyInvitationStatus {
     Pending,
     Accepted,
     Expired,
     Revoked,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Delivery {
+pub enum CompanyDeliveryView {
     Pending,
     Accepted,
     Failed,
     Unknown,
 }
 #[derive(Clone)]
-pub struct Invitation {
+pub struct CompanyInvitationView {
     pub id: String,
     pub issuer_user_id: String,
     pub email: String,
-    pub role: Role,
+    pub role: CompanyRoleView,
     pub expires_at_ms: u64,
-    pub status: InvitationStatus,
-    pub delivery: Delivery,
+    pub status: CompanyInvitationStatus,
+    pub delivery: CompanyDeliveryView,
 }
 #[derive(Clone)]
-pub struct MemberPage {
-    pub members: Vec<Member>,
+pub struct CompanyMemberPage {
+    pub members: Vec<CompanyMemberView>,
     pub next_cursor: Option<String>,
 }
 #[derive(Clone)]
-pub struct InvitationPage {
-    pub invitations: Vec<Invitation>,
+pub struct CompanyInvitationPage {
+    pub invitations: Vec<CompanyInvitationView>,
     pub next_cursor: Option<String>,
 }
-pub enum CommandResult {
-    Invitation(Invitation),
-    Member(Member),
+pub enum CompanyCommandResult {
+    Invitation(CompanyInvitationView),
+    Member(CompanyMemberView),
 }
