@@ -11,7 +11,7 @@ browser-bindings = ["dep:tsify", "dep:wasm-bindgen"]
 development-http = ["nddev-device-sync-accounts/development-http"]
 
 [dependencies]
-nddev-device-sync-accounts = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-accounts", rev = "b5b9de9d6b2cce7c435fefa21c4433ba6ed9d4ae" }
+nddev-device-sync-accounts = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-accounts", rev = "c09e4e9648ec5e83ed1cd23e0ed4f20bb2dab971" }
 nddev-device-sync-domain = { git = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git", rev = "0135c86b2887c7cea96c0f1082d70560bde00cc6" }
 serde_json = "1"
 serde = "1"
