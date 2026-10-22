@@ -33,3 +33,5 @@ Local `busy` contention with background work has at most eight admission attempt
 with a bounded 25–400 ms delay. The same captured identity lifetime and immutable
 command are retained. Transport errors, remote rejections and expired commands
 are not automatically retried. This does not add an operation queue or stop sync.
+
+Release journals live in [GitHub Releases](https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-organizations/releases).
