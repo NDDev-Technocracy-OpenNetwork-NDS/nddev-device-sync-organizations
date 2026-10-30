@@ -1375,7 +1375,7 @@ dependencies = [
  "libc",
  "libsecret",
  "nddev-device-sync-application",
- "nddev-device-sync-domain 0.0.12 (git+https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git?rev=238dcec49849712758b6559facce70c2d226b42c)",
+ "nddev-device-sync-domain",
  "nddev-device-sync-http-signatures",
  "nddev-device-sync-telemetry",
  "opentelemetry",
@@ -1408,24 +1408,13 @@ name = "nddev-device-sync-application"
 version = "0.0.1-alpha.21"
 source = "git+https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git?rev=238dcec49849712758b6559facce70c2d226b42c#238dcec49849712758b6559facce70c2d226b42c"
 dependencies = [
- "nddev-device-sync-domain 0.0.12 (git+https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git?rev=238dcec49849712758b6559facce70c2d226b42c)",
+ "nddev-device-sync-domain",
 ]
 
 [[package]]
 name = "nddev-device-sync-domain"
 version = "0.0.12"
 source = "git+https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git?rev=238dcec49849712758b6559facce70c2d226b42c#238dcec49849712758b6559facce70c2d226b42c"
-dependencies = [
- "serde",
- "thiserror 2.0.21",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "nddev-device-sync-domain"
-version = "0.0.12"
-source = "git+https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git?rev=e301b6f93423a21cac215513d60f91b2e9239419#e301b6f93423a21cac215513d60f91b2e9239419"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -1449,7 +1438,7 @@ name = "nddev-device-sync-organizations"
 version = "0.0.1-alpha.1"
 dependencies = [
  "nddev-device-sync-accounts",
- "nddev-device-sync-domain 0.0.12 (git+https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-core.git?rev=e301b6f93423a21cac215513d60f91b2e9239419)",
+ "nddev-device-sync-domain",
  "nddev-device-sync-telemetry",
  "opentelemetry",
  "opentelemetry_sdk",

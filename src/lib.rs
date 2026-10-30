@@ -116,8 +116,9 @@ impl OrganizationsClient {
             serde_json::from_slice(&reply.body).map_err(|_| invalid())?;
         if value.context.principal_id != self.principal.user
             || value.context.space.id != self.principal.user
-            || value.organizations.len()
-                > nddev_device_sync_domain::organizations::MAX_ORGANIZATIONS_PER_PRINCIPAL
+            // Defensive v3 OrganizationList.maxItems. This is a wire-size
+            // rejection; the server/Core remains the membership authority.
+            || value.organizations.len() > 32
         {
             return Err(invalid());
         }
