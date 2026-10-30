@@ -30,6 +30,11 @@ command. Closing/restarting does not replay or automatically resend mail. There
 is no offline administrative queue. Identity links and email verification belong
 to Accounts; no invitation tokens enter presentation DTOs.
 
+Client diagnostic actor fields keep the original Accounts owner/device tuple,
+which the signed telemetry gateway verifies. The selected organization and
+membership revision remain in the signed operation context and trusted server
+audit. This adds no organization-wide diagnostic query or global admin grant.
+
 The client distinguishes invitation state from mail delivery state. A successful
 creation receipt does not assert delivery or membership activation. Personal
 Vault, secrets and repositories remain private to their owners.

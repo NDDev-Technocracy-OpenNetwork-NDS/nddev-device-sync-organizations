@@ -402,17 +402,12 @@ impl PreparedCommand {
         let span = nddev_device_sync_telemetry::operation_span("organizations", "http")
             .map_err(|_| ClientError::TelemetryUnavailable)?;
         async {
-            let result=self.execute_inner().await;
-            let principal=self.owner.principal();
-            let tenant=match &self.owner {CommandOwner::Personal{..}=>principal.storage_tenant.as_str(),CommandOwner::Organization(selected)=>selected.company.as_str()};
-            match &result {
-                Ok(_)=>tracing::event!(target:"nddev_device_sync_organizations",tracing::Level::INFO,
-                    {event.name="company.command.completed",operation.id=self.id.as_str(),user.id=principal.user.as_str(),tenant.id=tenant,device.id=principal.device.as_str(),outcome="ok"}),
-                Err(error)=>tracing::event!(target:"nddev_device_sync_organizations",tracing::Level::WARN,
-                    {event.name="company.command.completed",operation.id=self.id.as_str(),user.id=principal.user.as_str(),tenant.id=tenant,device.id=principal.device.as_str(),outcome="error",error.type=error.code()}),
-            }
+            let result = self.execute_inner().await;
+            command_completed(self.owner.principal(), &self.id, &result);
             result
-        }.instrument(span).await
+        }
+        .instrument(span)
+        .await
     }
     async fn execute_inner(&self) -> Result<view::OrganizationCommandResult, ClientError> {
         self.id
@@ -505,11 +500,28 @@ impl PreparedCommand {
     }
 }
 
+fn command_completed(
+    principal: &Principal,
+    id: &CommandId,
+    result: &Result<view::OrganizationCommandResult, ClientError>,
+) {
+    // Existing signed telemetry binds tenant.id to the original Accounts actor.
+    // The organization/revision is carried by the signed request and trusted
+    // server audit, not substituted into this credential-bound producer tuple.
+    match result {
+        Ok(_) => tracing::event!(target:"nddev_device_sync_organizations",tracing::Level::INFO,
+            {event.name="company.command.completed",operation.id=id.as_str(),user.id=principal.user.as_str(),tenant.id=principal.storage_tenant.as_str(),device.id=principal.device.as_str(),outcome="ok"}),
+        Err(error) => {
+            tracing::event!(target:"nddev_device_sync_organizations",tracing::Level::WARN,
+            {event.name="company.command.completed",operation.id=id.as_str(),user.id=principal.user.as_str(),tenant.id=principal.storage_tenant.as_str(),device.id=principal.device.as_str(),outcome="error",error.type=error.code()})
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn local_admission_wait_is_bounded_and_accepted_by_the_actual_sdk() {
+    fn captured(work: impl FnOnce()) -> Vec<serde_json::Value> {
         use opentelemetry::trace::TracerProvider;
         use std::{io::Write, sync::Mutex};
         #[derive(Clone)]
@@ -543,7 +555,18 @@ mod tests {
             provider.tracer("organizations-acceptance"),
         )
         .unwrap();
-        tracing::subscriber::with_default(subscriber, || {
+        tracing::subscriber::with_default(subscriber, work);
+        assert_eq!(control.rejected_fields_or_events(), 0);
+        let bytes = output.0.lock().unwrap();
+        std::str::from_utf8(&bytes)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+    #[test]
+    fn local_admission_wait_is_bounded_and_accepted_by_the_actual_sdk() {
+        let events = captured(|| {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
@@ -567,13 +590,6 @@ mod tests {
                 assert_eq!(attempts, 1);
             });
         });
-        assert_eq!(control.rejected_fields_or_events(), 0);
-        let bytes = output.0.lock().unwrap();
-        let events: Vec<serde_json::Value> = std::str::from_utf8(&bytes)
-            .unwrap()
-            .lines()
-            .map(|line| serde_json::from_str(line).unwrap())
-            .collect();
         let waiting: Vec<_> = events
             .iter()
             .filter(|event| event["event.name"] == "company.admission.waiting")
@@ -581,6 +597,62 @@ mod tests {
         assert_eq!(waiting.len(), 1);
         assert_eq!(waiting[0]["outcome"], "pending");
         assert_eq!(waiting[0]["module"], "organizations");
+    }
+    #[test]
+    fn actual_sdk_command_fields_keep_the_original_signed_actor() {
+        let events = captured(|| {
+            // Producer metadata only: this test constructs no credential/grant.
+            let mut principal = Principal::new(Arc::new(
+                IdentityClient::new("https://example.invalid").unwrap(),
+            ));
+            principal.user = "original-principal".into();
+            principal.storage_tenant = "original-storage".into();
+            principal.device = "original-device".into();
+            let id = CommandId::new(uuid::Uuid::now_v7().to_string()).unwrap();
+            let result = Ok(view::OrganizationCommandResult::Organization(
+                view::OrganizationOverviewView {
+                    company_id: "selected-organization".into(),
+                    name: "Same name".into(),
+                    revision: 1,
+                    member: view::OrganizationMemberView {
+                        user_id: principal.user.clone(),
+                        email: None,
+                        role: view::OrganizationRoleView::Admin,
+                        active: true,
+                        revision: 1,
+                    },
+                },
+            ));
+            let span =
+                nddev_device_sync_telemetry::operation_span("organizations", "http").unwrap();
+            span.in_scope(|| {
+                command_completed(&principal, &id, &result);
+                command_completed(
+                    &principal,
+                    &id,
+                    &Err(ClientError::Server("authorization_denied".into())),
+                );
+            });
+        });
+        let completion: Vec<_> = events
+            .iter()
+            .filter(|event| event["event.name"] == "company.command.completed")
+            .collect();
+        assert_eq!(completion.len(), 2);
+        for event in &completion {
+            assert_eq!(event["user.id"], "original-principal");
+            assert_eq!(event["tenant.id"], "original-storage");
+            assert_eq!(event["device.id"], "original-device");
+            assert_eq!(event["module"], "organizations");
+            assert_eq!(event["scope"], "http");
+        }
+        assert_eq!(completion[0]["outcome"], "ok");
+        assert_eq!(completion[1]["error.type"], "authorization_denied");
+        assert!(
+            !serde_json::to_string(&events)
+                .unwrap()
+                .contains("selected-organization")
+        );
     }
 
     #[test]
