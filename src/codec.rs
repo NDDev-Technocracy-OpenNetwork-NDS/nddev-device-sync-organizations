@@ -1,5 +1,5 @@
 use crate::{invalid, view};
-use nddev_device_sync_accounts::{ClientError, company_wire as dto};
+use nddev_device_sync_accounts::{ClientError, organizations_wire as dto};
 use nddev_device_sync_domain::{UserId, identity::EmailAddress, sync::MAX_REVISION};
 
 pub(crate) fn revision(value: i64) -> Result<u64, ClientError> {
@@ -97,6 +97,42 @@ pub(crate) fn page<'a>(
     }
     if count > nddev_device_sync_domain::organizations::commands::PAGE_SIZE
         || next.is_some_and(|next| count == 0 || Some(next) != previous)
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+/// Public organization metadata retains the initiating principal separately
+/// from the organization ID. Names never confer membership.
+pub(crate) fn overview(
+    value: dto::CompanyOverview,
+    principal: &str,
+) -> Result<view::OrganizationOverviewView, ClientError> {
+    id(&value.company.company_id)?;
+    nddev_device_sync_domain::organizations::CompanyName::new(value.company.display_name.clone())
+        .map_err(|_| invalid())?;
+    let member = member(value.member)?;
+    if member.user_id != principal || !member.active {
+        return Err(invalid());
+    }
+    Ok(view::OrganizationOverviewView {
+        company_id: value.company.company_id,
+        name: value.company.display_name,
+        revision: revision(value.company.revision)?,
+        member,
+    })
+}
+
+pub(crate) fn context(
+    value: &dto::OrganizationContext,
+    principal: &str,
+    company: &str,
+    captured: u64,
+) -> Result<(), ClientError> {
+    if value.principal_id != principal
+        || value.space.id != company
+        || revision(value.membership_revision)? != captured
     {
         return Err(invalid());
     }
