@@ -118,6 +118,7 @@ pub struct OrganizationInvitationPageView {
     pub next_cursor: Option<String>,
 }
 pub enum OrganizationCommandResult {
+    Organization(OrganizationOverviewView),
     Invitation(OrganizationInvitationView),
     Member(OrganizationMemberView),
 }
