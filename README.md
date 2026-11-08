@@ -39,7 +39,10 @@ The client distinguishes invitation state from mail delivery state. A successful
 creation receipt does not assert delivery or membership activation. Personal
 Vault, secrets and repositories remain private to their owners.
 
-Run `just check wasm-check`. `just backend-acceptance` uses an explicitly started
+`just check` runs source-only format, license/source and unused-dependency checks.
+Run `just test` and `just wasm-check` on an execution host. `just verify` combines
+those with a release build, advisory audit and real backend acceptance.
+`just backend-acceptance` uses an explicitly started
 isolated server PostgreSQL/Mailpit fixture (`NDS_FIXTURE_RECEIPT`) and native
 credential service. It exercises actual signing, invitation replay/revoke/email
 verification, account switching, role revision conflicts and last-admin denial.
