@@ -6,6 +6,12 @@ rust-version = "1.99"
 license = "AGPL-3.0-only"
 repository = "https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-organizations"
 
+# cargo-shear unused_optional_dependency cannot inspect Tsify's generated code.
+# tsify-macros emits direct wasm_bindgen paths for every browser view declaration;
+# the browser-bindings target gate compiles those expansions with this dependency.
+[package.metadata.cargo-shear]
+ignored = ["wasm-bindgen"]
+
 [features]
 browser-bindings = ["dep:tsify", "dep:wasm-bindgen"]
 development-http = ["nddev-device-sync-accounts/development-http"]
