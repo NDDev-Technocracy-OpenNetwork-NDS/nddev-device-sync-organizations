@@ -22,3 +22,8 @@ wasm-check:
 # Requires a private receipt and an isolated real native credential service.
 backend-acceptance:
     cargo test --locked --features development-http --test backend -- --ignored
+
+# GitHub's runners lack the credential-store build inputs this workspace links; CI runs this
+# before the checks (setup: true).
+setup:
+    if [ "${GITHUB_ACTIONS:-}" = true ] && [ "${RUNNER_ENVIRONMENT:-}" = github-hosted ]; then sudo apt-get update -qq && sudo apt-get install -qq --no-install-recommends -y libsecret-1-dev; fi
