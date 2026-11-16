@@ -9,5 +9,5 @@ configuration or runtime evidence. Administrative commands are online, immutable
 owner/device/lifetime-bound and short-lived. Keep uncertain results explicit and retry
 the exact command; never replace its ID/body, resend mail automatically or equate SMTP
 acceptance to join. Run just check, WASM checks and actual owned backend/native
-acceptance. Signed work -> dev -> main; no implicit deployment, migration or credential
+acceptance. Work -> dev -> main; no implicit deployment, migration or credential
 changes.

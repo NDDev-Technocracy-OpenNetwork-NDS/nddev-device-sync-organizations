@@ -1,0 +1,4 @@
+[submodule "ci-fixture-accounts"]
+	path = tests/fixtures/accounts
+	url = https://github.com/NDDev-Technocracy-OpenNetwork-NDS/nddev-device-sync-accounts.git
+	branch = main
