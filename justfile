@@ -1,6 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# Checks source and command formatting without compilation.
 check:
+    just --fmt --check
     cargo fmt --check
     cargo deny --locked check licenses sources
     cargo shear --locked --deny-warnings
@@ -12,7 +14,7 @@ test:
     cargo test --locked --doc --jobs 4
 
 # Full acceptance needs a fresh owned backend/native credential fixture.
-verify: check test wasm-check backend-acceptance
+verify: check test wasm-check ci-backend-acceptance
     cargo build --locked --release --jobs 4
     cargo audit --deny warnings
 
@@ -23,7 +25,11 @@ wasm-check:
 backend-acceptance:
     cargo test --locked --features development-http --test backend -- --ignored
 
-# GitHub's runners lack the credential-store build inputs this workspace links; CI runs this
-# before the checks (setup: true).
+# Runs the same backend case under Accounts owned server and native-store fixture.
+ci-backend-acceptance:
+    python3 tools/with_backend.py
+
+# Fetches declared fixture tools and prepares native credential inputs on hosted Linux.
 setup:
-    if [ "${GITHUB_ACTIONS:-}" = true ] && [ "${RUNNER_ENVIRONMENT:-}" = github-hosted ]; then sudo apt-get update -qq && sudo apt-get install -qq --no-install-recommends -y libsecret-1-dev; fi
+    git submodule update --init tests/fixtures/accounts
+    python3 tools/setup_ci.py
